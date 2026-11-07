@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>Sift — full-text search</title>
+<style>
+  :root{--ink:#14181d;--muted:#5b6670;--line:#e2e6ea;--bg:#f6f7f9;--card:#fff;--accent:#2f5bea;--ok:#177245;--bad:#b3261e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:16px;letter-spacing:-.01em}
+  h1 span{display:block;font-size:12.5px;font-weight:400;color:var(--muted)}
+  main{max-width:900px;margin:0 auto;padding:18px 20px 40px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  label{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  input,textarea{padding:9px 11px;font:14px/1.4 ui-sans-serif,system-ui,sans-serif;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit;width:100%}
+  textarea{min-height:60px;resize:vertical}
+  .search{display:flex;gap:10px}
+  .search input{flex:1}
+  button{font:inherit;font-weight:600;padding:8px 13px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;white-space:nowrap}
+  button.secondary{background:#fff;color:var(--ink);border-color:var(--line)}
+  .toggles{display:flex;gap:16px;margin-top:10px;font-size:13.5px;color:var(--muted)}
+  .toggles label{display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:13.5px;font-weight:500;margin:0}
+  .hits{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+  .hit{border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .hit .id{font-weight:700;font-size:13.5px}
+  .hit .text{color:var(--muted);font-size:13px;margin-top:2px}
+  .score{font:12.5px/1.4 ui-monospace,monospace;background:#eef1f4;border-radius:6px;padding:3px 8px;white-space:nowrap}
+  .empty{color:var(--muted);font-size:13.5px}
+  .hint{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Sift<span>positional index and BM25 ranking, no dependencies</span></h1>
+</header>
+<main>
+  <section class="card">
+    <label for="q">Search</label>
+    <div class="search">
+      <input id="q" type="text" value="lazy dog" aria-label="search query" />
+      <button id="go" type="button">Search</button>
+    </div>
+    <div class="toggles">
+      <label><input id="phrase" type="checkbox" /> phrase (adjacent words only)</label>
+      <label><input id="prefix" type="checkbox" /> prefix match</label>
+    </div>
+    <ul id="hits" class="hits"></ul>
+    <p id="summary" class="hint">Results are ranked by score; phrase search only matches words that are actually adjacent.</p>
+  </section>
+  <section class="card">
+    <label for="doc">Add a document</label>
+    <textarea id="doc" placeholder="Text to index…">A lazy dog sleeps in the sun while the fox runs.</textarea>
+    <div class="search" style="margin-top:10px">
+      <input id="docId" type="text" value="doc-4" aria-label="document id" style="max-width:180px" />
+      <button id="add" class="secondary" type="button">Index it</button>
+    </div>
+  </section>
+</main>
+<script>
+  const $ = (selector) => document.querySelector(selector);
+
+  function hitRow(hit) {
+    const item = document.createElement("li");
+    item.className = "hit";
+    const left = document.createElement("div");
+    const id = document.createElement("div");
+    id.className = "id";
+    id.textContent = hit.id;
+    const text = document.createElement("div");
+    text.className = "text";
+    text.textContent = (hit.matchedTerms ?? []).length ? "matched: " + hit.matchedTerms.join(", ") : "";
+    left.append(id, text);
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = Number(hit.score).toFixed(3);
+    item.append(left, score);
+    return item;
+  }
+
+  async function search() {
+    const q = $("#q").value.trim();
+    const list = $("#hits");
+    list.replaceChildren();
+    if (!q) return;
+    const phrase = $("#phrase").checked;
+    const prefix = $("#prefix").checked && !phrase;
+    const path = phrase
+      ? `/phrase?q=${encodeURIComponent(q)}`
+      : `/search?q=${encodeURIComponent(q)}${prefix ? "&prefix=1" : ""}`;
+    const res = await fetch(path);
+    const data = await res.json();
+    const hits = data.hits ?? [];
+    $("#summary").textContent = hits.length
+      ? hits.length + " result" + (hits.length === 1 ? "" : "s") + " for " + JSON.stringify(q)
+      : "No matches for " + JSON.stringify(q);
+    for (const hit of hits) list.append(hitRow(hit));
+  }
+
+  async function addDocument() {
+    const id = $("#docId").value.trim();
+    const text = $("#doc").value;
+    if (!id || !text.trim()) return;
+    const res = await fetch("/documents", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, text }),
+    });
+    if (res.ok) search();
+    else $("#summary").textContent = "Could not index that document.";
+  }
+
+  $("#go").addEventListener("click", search);
+  $("#q").addEventListener("keydown", (event) => { if (event.key === "Enter") search(); });
+  $("#phrase").addEventListener("change", search);
+  $("#prefix").addEventListener("change", search);
+  $("#add").addEventListener("click", addDocument);
+
+  search();
+</script>
+</body>
+</html>
