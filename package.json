@@ -1,0 +1,12 @@
+{
+  "name": "@noah/sift",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "In-memory full-text search with BM25 ranking, phrase queries and prefix matching.",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
