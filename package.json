@@ -3,10 +3,23 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "In-memory full-text search with BM25 ranking, phrase queries and prefix matching.",
-  "engines": { "node": ">=24" },
-  "scripts": {
-    "test": "node --test"
+  "description": "Full-text search with a positional inverted index and BM25 ranking, plus a browser demo.",
+  "engines": {
+    "node": ">=24"
   },
-  "license": "MIT"
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server.ts"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MotherTheresa64/sift.git"
+  },
+  "homepage": "https://github.com/MotherTheresa64/sift#readme",
+  "keywords": [
+    "nodejs",
+    "typescript",
+    "zero-dependencies"
+  ]
 }
